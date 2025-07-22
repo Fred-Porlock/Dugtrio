@@ -1,0 +1,4 @@
+helpers文件夹的各种文件中引用的circomlib路径为本地的绝对路径，需要修改
+首先运行npm install circomlib
+然后npm list circomlib，找到circomlib的安装路径
+最后替换所有node_modules的路径
