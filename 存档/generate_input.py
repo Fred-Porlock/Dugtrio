@@ -53,46 +53,31 @@ num_sha2_blocks = len(padded_unsigned_jwt) // 64
 maxPaddedUnsignedJWTLen = 64 * 25
 padded_unsigned_jwt = padded_unsigned_jwt.ljust(maxPaddedUnsignedJWTLen, b'\0')
 
+# jwt的header和payload的长度
+header_payload_length = len(unsigned_jwt)
+
 # 将jwt_payload转换为byte数组
 padded_unsigned_jwt = list(padded_unsigned_jwt)
 
+# jwt的签名
+signature = jwt.split('.')[2]
+# 把签名base64解码
+signature_bytes = base64.urlsafe_b64decode(signature + '==')  # 补齐等号
+# 将解码后的字节用小端法转换为8字节整数列表
+# 8字节
+signature_ints = [int.from_bytes(signature_bytes[i:i + 8], 'little') for i in range(0, len(signature_bytes), 8)]
 
-# 从jwt中提取iss字段
-
-# 截取payload
-payload = jwt.split('.')[1]
-# 补充=
-payload = payload + '=' * (-len(payload) % 4)
-# base64url解码
-payload_bytes = base64.urlsafe_b64decode(payload)
-# 转换为字符串
-payload_str = payload_bytes.decode('utf-8')
-# print(f"Decoded payload: {payload_str}")
-
-# 找到iss字段起始位置
-iss_start_index = payload_str.index('"iss":"')
-# 找到iss字段结束位置
-iss_end_index = payload_str.index('"', iss_start_index + 7)
-# 截取iss字段
-iss = payload_str[iss_start_index : iss_end_index+1]
-# print(iss)
-
-# 根据iss字段起始位置计算base64编码后的payload中的起始位置
-iss_start_index_base64 = (iss_start_index // 3) * 4
-# 根据iss字段结束位置计算base64编码后的payload中的结束位置
-iss_end_index_base64 = (iss_end_index // 3) * 4 + 4
-# 截取base64编码后的iss字段
-iss_base64 = payload[iss_start_index_base64 : iss_end_index_base64]
-# 解码为字符串
-iss_decoded = base64.urlsafe_b64decode(iss_base64).decode('utf-8')
-print(f"Decoded iss: {iss_decoded}")
+# 把pk的n用小端法转换为8字节整数列表
+modulus_bytes = base64.urlsafe_b64decode(pk['n'] + '==')  # 补齐等号
+modulus_ints = [int.from_bytes(modulus_bytes[i:i + 8], 'little') for i in range(0, len(modulus_bytes), 8)]
 
 output = {
     "padded_unsigned_jwt": padded_unsigned_jwt,
+    "payload_start_index": first_dot_index + 1,
     "num_sha2_blocks": num_sha2_blocks,
-    "sha2pad_index": second_dot_index,
-    "iss_index_b64": first_dot_index + 1 + iss_start_index_base64,
-    "iss_length_b64": iss_end_index_base64 - iss_start_index_base64
+    "payload_len": second_dot_index - first_dot_index - 1,
+    "signature": signature_ints,
+    "modulus": modulus_ints
 }
 
 with open('input.json', 'w') as f:

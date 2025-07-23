@@ -10,4 +10,4 @@ include "dugtrio.circom";
 // maxAudValueLen = 145
 // maxWhiteSpaceLen = 6
 // maxExtIssLength = 165
-component main = Dugtrio(248, 64 * 25);
+component main = Dugtrio(64 * 25, 224);
