@@ -4,7 +4,7 @@ include "helpers/jwtchecks.circom";
 include "helpers/hasher.circom";
 include "./merkleTree.circom";
 
-template checkAud(maxPaddedUnsignedJWTLen, maxAudValueLen, maxWhiteSpaceLen) {
+template checkAud(maxPaddedUnsignedJWTLen, maxAudValueLen, maxSubValueLen, maxWhiteSpaceLen) {
     var inCount = maxPaddedUnsignedJWTLen;
 
     signal input padded_unsigned_jwt[inCount];
@@ -20,6 +20,7 @@ template checkAud(maxPaddedUnsignedJWTLen, maxAudValueLen, maxWhiteSpaceLen) {
     // 1 for colon, 1 for comma / brace
     var maxExtAudLength = aud_name_length + maxAudValueLenWithQuotes + 2 + maxWhiteSpaceLen; // 160
 
+    // aud
     signal input aud[maxExtAudLength];
     signal input aud_length;
     signal input aud_index_b64;
@@ -53,6 +54,45 @@ template checkAud(maxPaddedUnsignedJWTLen, maxAudValueLen, maxWhiteSpaceLen) {
         aud_name_with_quotes[i] === expected_aud_name[i];
     }
 
+    var sub_name_length = 3 + 2; // 5, "sub"
+    var maxSubValueLenWithQuotes = maxSubValueLen + 2; // 147, 2 for quotes
+    // 1 for colon, 1 for comma / brace
+    var maxExtSubLength = sub_name_length + maxSubValueLenWithQuotes + 2 + maxWhiteSpaceLen; // 160
+
+    // sub
+    signal input sub[maxExtSubLength];
+    signal input sub_length;
+    signal input sub_index_b64;
+    signal input sub_length_b64;
+    signal input sub_colon_index;
+    signal input sub_value_index;
+    signal input sub_value_length; // with quotes
+    signal sub_name_with_quotes[sub_name_length];
+    signal sub_value_with_quotes[maxSubValueLenWithQuotes];
+
+    component SubExtClaim = ExtClaimOps(
+        inCount, maxExtSubLength, sub_name_length, maxSubValueLenWithQuotes, maxWhiteSpaceLen
+    );
+    SubExtClaim.content <== padded_unsigned_jwt;
+    SubExtClaim.index_b64 <== sub_index_b64;
+    SubExtClaim.length_b64 <== sub_length_b64;
+    SubExtClaim.ext_claim <== sub;
+    SubExtClaim.ext_claim_length <== sub_length;
+    SubExtClaim.name_length <== sub_name_length;
+    SubExtClaim.colon_index <== sub_colon_index;
+    SubExtClaim.value_index <== sub_value_index;
+    SubExtClaim.value_length <== sub_value_length;
+    SubExtClaim.payload_start_index <== payload_start_index;
+
+    sub_name_with_quotes <== SubExtClaim.claim_name;
+    sub_value_with_quotes <== SubExtClaim.claim_value;
+
+    // Check if sub_name_with_quotes == "sub"
+    var expected_sub_name[sub_name_length] = [34, 115, 117, 98, 34];
+    for (var i = 0; i < sub_name_length; i++) {
+        sub_name_with_quotes[i] === expected_sub_name[i];
+    }
+
 
     // signal input path[4];
 
@@ -63,4 +103,4 @@ template checkAud(maxPaddedUnsignedJWTLen, maxAudValueLen, maxWhiteSpaceLen) {
 }
 
 // component main {public [iss]} = checkAud(1600, 145);\
-component main = checkAud(1600, 145, 6);
+component main = checkAud(1600, 145, 115, 6);

@@ -39,32 +39,36 @@ def sha256_padding(message):
     return bytes(padded)
 
 # claimName包含引号
-def claimOperations(payload, claimName):
+def claimOperations(payload, claimName, offset = 0):
     # claim起始位置
-    claim_start_index = payload.index(claimName)
+    claim_index = payload.index(claimName)
     # claim的结束位置
-    claim_value_start_index = payload.index('"', claim_start_index + len(claimName))
-    claim_end_index = payload.index('"', claim_value_start_index + 1)
-    # 截取claim，包括claimName和claimValue
-    claim = payload[claim_start_index : claim_end_index + 1]
+    claim_value_index_payload = payload.index('"', claim_index + len(claimName))
+    quote_index = payload.index('"', claim_value_index_payload + 1)
+    comma_index = payload.index(',', claim_value_index_payload + 1)
+    # 截取claim，包括claimName和claimValue和逗号
+    claim = payload[claim_index : comma_index + 1]
     length = len(claim)
     # 冒号的下标
-    claim_colon_index = claim.index(':')
+    colon_index = claim.index(':')
     # claimValue的起始位置
-    claim_value_index = claim.index('"', claim_colon_index + 1)
+    claim_value_index = claim.index('"', colon_index + 1)
     # 截取claimValue
-    claim_value = claim[claim_value_index : claim_end_index + 1]
+    claim_value = payload[claim_value_index_payload : quote_index + 1]
     # claimValue的长度
     claim_value_length = len(claim_value)
 
     # 根据claim起始位置计算base64编码后的payload中的起始位置
-    claim_start_index_b64 = (claim_start_index // 3) * 4
+    # 注意这里要精确计算。比如“1234”编码了“abc”，“b”的base64的index是1，而不是0，因为“23”包含了“b"的编码；同理，“c”的index是2
+    # 这样从中间切割的坏处是不能直接base64解码
+    claim_index_b64 = (claim_index % 3) + (claim_index // 3) * 4 + offset
     # 根据claim结束位置计算base64编码后的payload中的结束位置
-    claim_end_index_b64 = (claim_end_index // 3) * 4 + 4
+    # TODO: 可能是对的，我想不清楚了
+    claim_end_index_b64 = ((quote_index+1) // 3) * 4 + 2 + ((quote_index+1)%3) + offset
     # base64编码后的claim的长度
-    length_b64 = claim_end_index_b64 - claim_start_index_b64
+    length_b64 = claim_end_index_b64 - claim_index_b64
 
-    return (claim, length, claim_start_index_b64, length_b64, claim_colon_index, claim_value_index, claim_value_length, claim_value)
+    return (claim, length, claim_index_b64, length_b64, colon_index, claim_value_index, claim_value_length, claim_value)
 
 jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImI1MDljNTEzODc2OGY3Y2YyZTgyN2UwNGIyN2U3ZTRjYmM3YmI5MTkiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI1NzMxMjAwNzA4NzEtMGs3Z2E2bnM3OWllMGpwZzFlaTZpcDV2amUyb3N0dDYuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI1NzMxMjAwNzA4NzEtMGs3Z2E2bnM3OWllMGpwZzFlaTZpcDV2amUyb3N0dDYuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTIwMzc1OTAzMjI2MzMwMTYzNTAiLCJub25jZSI6IkpXbTdpZEN0OXN2U2pKR0VxSnZnTHNBV3dqZyIsIm5iZiI6MTc1MzA3NzkzMiwiaWF0IjoxNzUzMDc4MjMyLCJleHAiOjE3NTMwODE4MzIsImp0aSI6IjJmYmM4NWJkMGRiZGJlNWUzYmY5NDQ4YTBiNzY1MDg2MzkxZjI1OGYifQ.O16GaZdNpFphpmFSbzNpWQd7xjjYd9E8Tic4tr0Rkt1DYC0BRSiAg2aD-m8X1cWKHQVgzfMgQy8jacdXmzQPyy6DuilE03Y_3Z4xNj9jBhQWKDO9Z-q6MgFuL0mM3WYhGA2Q5DAXBvSU-dnTrLyT2ELMvTufOFyI4zxwg1eHxEcqZNXXZluCnZDxHA7RUP0uxnuFR-VGoQyUehGFzlaZ4fmfqOH8KjZkoQgYZxcVtHV0oZ8VlMdfFqd6TKWvKDgnoIQXr3ZYaP7fawu8nJa3Cqb86JgaMszGtKkY3mKugm06AVm71VmcKQihhxx-B4bv6nxAOAx10B3QcUr3OAzGRQ"
 
@@ -96,25 +100,25 @@ payload = jwt.split('.')[1]
 # base64url解码
 payload = base64url_decode(payload)
 
-# 处理iss
-(iss, iss_length, iss_start_index_b64, iss_length_b64, iss_colon_index, iss_value_index, iss_value_length, iss_value) = claimOperations(payload, '"iss"')
+# # 处理iss
+# (iss, iss_length, iss_start_index_b64, iss_length_b64, iss_colon_index, iss_value_index, iss_value_length, iss_value) = claimOperations(payload, '"iss"', offset = first_dot_index + 1)
 
-# 把iss每16字节转换为一个int
-iss_value_ints = [int.from_bytes(iss_value.encode('utf-8')[i:i+16], 'big') for i in range(0, len(iss_value.encode('utf-8')), 16)]
+# # 把iss每16字节转换为一个int
+# iss_value_ints = [int.from_bytes(iss_value.encode('utf-8')[i:i+16], 'big') for i in range(0, len(iss_value.encode('utf-8')), 16)]
 
 # 处理aud
-(aud, aud_length, aud_start_index_b64, aud_length_b64, aud_colon_index, aud_value_index, aud_value_length, aud_value) = claimOperations(payload, '"aud"')
+(aud, aud_length, aud_index_b64, aud_length_b64, aud_colon_index, aud_value_index, aud_value_length, aud_value) = claimOperations(payload, '"aud"', offset = first_dot_index + 1)
 
 # 把aud逐字符转换为int数组
-aud_int = [ord(c) for c in aud_value]
+aud_int = [ord(c) for c in aud]
 maxAudValueLen = 160
 # 把aud_int填充全0到maxAudValueLen长度
 aud_int = aud_int + [0] * (maxAudValueLen - len(aud_int))
 
 # 处理sub
-(sub, sub_length, sub_start_index_b64, sub_length_b64, sub_colon_index, sub_value_index, sub_value_length, sub_value) = claimOperations(payload, '"sub"')
+(sub, sub_length, sub_index_b64, sub_length_b64, sub_colon_index, sub_value_index, sub_value_length, sub_value) = claimOperations(payload, '"sub"', offset = first_dot_index + 1)
 # 把sub逐字符转换为int数组
-sub_int = [ord(c) for c in sub_value]
+sub_int = [ord(c) for c in sub]
 maxSubValueLen = 130
 # 把sub_int填充全0到maxSubValueLen长度
 sub_int = sub_int + [0] * (maxSubValueLen - len(sub_int))
@@ -129,18 +133,18 @@ output = {
     # "iss": iss_value_ints,
     "aud": aud_int,
     "aud_length": aud_length,
-    "aud_index_b64": aud_start_index_b64,
+    "aud_index_b64": aud_index_b64,
     "aud_length_b64": aud_length_b64,
     "aud_colon_index": aud_colon_index,
     "aud_value_index": aud_value_index,
-    "aud_value_length": aud_value_length
-    # "sub": sub_int,
-    # "sub_length": sub_length,
-    # "sub_index_b64": sub_start_index_b64,
-    # "sub_length_b64": sub_length_b64,
-    # "sub_colon_index": sub_colon_index,
-    # "sub_value_index": sub_value_index,
-    # "sub_value_length": sub_value_length
+    "aud_value_length": aud_value_length,
+    "sub": sub_int,
+    "sub_length": sub_length,
+    "sub_index_b64": sub_index_b64,
+    "sub_length_b64": sub_length_b64,
+    "sub_colon_index": sub_colon_index,
+    "sub_value_index": sub_value_index,
+    "sub_value_length": sub_value_length
 }
 
 with open('input.json', 'w') as f:
