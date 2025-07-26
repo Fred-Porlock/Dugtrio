@@ -81,60 +81,6 @@ template zkLogin(maxHeaderLen, maxPaddedUnsignedJWTLen,
     var inCount = maxPaddedUnsignedJWTLen;
 
     /**
-     1. Parse out the JWT header 
-    **/
-    signal input padded_unsigned_jwt[inCount];
-    signal input payload_start_index;
-
-    // Extract the header
-    var header_length = payload_start_index - 1;
-    signal header[maxHeaderLen] <== SliceFromStart(inCount, maxHeaderLen)(
-        padded_unsigned_jwt, header_length
-    );
-    signal header_F <== HashBytesToField(maxHeaderLen)(header);
-
-    // Check that there is a dot after header
-    var x = SingleMultiplexer(inCount)(padded_unsigned_jwt, header_length);
-    x === 46; // 46 is the ASCII code for '.'
-
-    /**
-     2. SHA2 operations over padded_unsigned_jwt
-        - Check the validity of SHA2 padding
-        - Compute SHA2(padded_unsigned_jwt)
-    */
-    signal input num_sha2_blocks;
-    signal input payload_len;
-
-    // Check the validity of the SHA2 padding
-    var padded_unsigned_jwt_len = 64 * num_sha2_blocks; // 64 bytes per SHA2 block
-    var sha2pad_index = payload_start_index + payload_len;
-    SHA2PadVerifier(inCount)(padded_unsigned_jwt, padded_unsigned_jwt_len, sha2pad_index);
-
-    var hashCount = 4;
-    var hashWidth = 256 / hashCount;
-    signal jwt_sha2_hash[hashCount] <== Sha2_wrapper(inWidth, inCount, hashWidth, hashCount)(
-        padded_unsigned_jwt, num_sha2_blocks
-    );
-
-    /**
-     3. Check signature
-    **/
-    signal input signature[32]; // The JWT signature  
-    signal input modulus[32];
-    var jwt_sha2_hash_le[4]; // converting to little endian
-    for (var i = 0; i < 4; i++) {
-        jwt_sha2_hash_le[i] = jwt_sha2_hash[3 - i];
-    }
-    RSAVerify65537()(signature, modulus, jwt_sha2_hash_le);
-
-    // HashToField for revealing modulus
-    var modulus_be[32]; // converting to big endian
-    for (var i = 0; i < 32; i++) {
-        modulus_be[i] = modulus[31 - i];
-    }
-    signal modulus_F <== HashToField(64, 32)(modulus_be);
-
-    /**
      4. Checks on extended_key_claim + extract key claim name, value
 
     Note that the OpenID standard permits extended_key_claim to be any valid JSON member. 
@@ -338,55 +284,4 @@ template zkLogin(maxHeaderLen, maxPaddedUnsignedJWTLen,
     for (var i = 0; i < aud_name_length; i++) {
         aud_name_with_quotes[i] === expected_aud_name[i];
     }
-
-    // HashBytesToField for later use
-    signal aud_value[maxAudValueLen] <== QuoteRemover(maxAudValueLen + 2)(
-        aud_value_with_quotes, aud_value_length
-    );
-    signal aud_value_F <== HashBytesToField(maxAudValueLen)(aud_value);
-
-    /**
-    8. Reveal the portion of JWT encoding the extended iss claim.
-       Note that we are revealing a base64 string.
-    **/
-    signal input iss_index_b64;
-    signal input iss_length_b64;
-    var iss_b64_F; // output
-    var iss_index_in_payload_mod_4; // output
-
-    var maxExtIssLength_b64 = 4 * (1 + (maxExtIssLength \ 3)); // max(b64Len(maxA, i)) for any i
-    var iss_b64[maxExtIssLength_b64] = SliceEfficient(inCount, maxExtIssLength_b64)(
-        padded_unsigned_jwt, iss_index_b64, iss_length_b64
-    );
-
-    // HashBytesToField for all inputs hash
-    iss_b64_F = HashBytesToField(maxExtIssLength_b64)(iss_b64);
-    iss_index_in_payload_mod_4 = RemainderMod4(numBits(inCount))(iss_index_b64 - payload_start_index);
-
-    /**
-    9. Compute the address seed
-    **/
-    signal input salt;
-    signal hashed_salt <== Hasher(1)([salt]);
-    signal address_seed <== Hasher(4)([
-        kc_name_F, kc_value_F, aud_value_F, hashed_salt
-    ]);
-
-    /**
-    10. Compress public inputs
-        We reveal a hash of some signals to the verifier. These signal values
-        need to be given to the verifier along with ZK proof.
-    **/
-    signal input all_inputs_hash;
-    signal all_inputs_hash_actual <== Hasher(8)([
-        eph_public_key[0],
-        eph_public_key[1],
-        address_seed,
-        max_epoch,
-        iss_b64_F,
-        iss_index_in_payload_mod_4,
-        header_F,
-        modulus_F
-    ]);
-    all_inputs_hash === all_inputs_hash_actual;
 }

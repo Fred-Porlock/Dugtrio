@@ -85,3 +85,72 @@ iss_decoded = base64.urlsafe_b64decode(iss_cut_bytes)
 # 打印解码后的iss
 print(f"Decoded iss from cut: {iss_decoded.decode('utf-8')}")
 '''
+
+# # 计算并验证nonce
+
+# jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImI1MDljNTEzODc2OGY3Y2YyZTgyN2UwNGIyN2U3ZTRjYmM3YmI5MTkiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI1NzMxMjAwNzA4NzEtMGs3Z2E2bnM3OWllMGpwZzFlaTZpcDV2amUyb3N0dDYuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI1NzMxMjAwNzA4NzEtMGs3Z2E2bnM3OWllMGpwZzFlaTZpcDV2amUyb3N0dDYuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTIwMzc1OTAzMjI2MzMwMTYzNTAiLCJub25jZSI6InE0S20yR25tZlpSOE85UE5BNjJ5SWoyeHMwZyIsIm5iZiI6MTc1MzMzNTM0NiwiaWF0IjoxNzUzMzM1NjQ2LCJleHAiOjE3NTMzMzkyNDYsImp0aSI6ImJmODk4MDMyYjkyMTExYWY1MWQxYTEwN2I1MGUzMGZjMTIwZTllOWMifQ.kDBYGO0Hy_sfW7xp4AmTHCjCAw85FWvAj1jcSiprHE0pYQDk2zVE6UJwlOV1573mFku4Yl_AF8JPC7jUCMEpuKbQ0c3Xi5Rj2oGSzcugXIOB592MVfcZ-gQrWosPyga1-4ZI-VnHfZAQp5vU9sDbpOVblgBMUAXXgyUpkeRMI_PS8raFwc-JqsY6wKUonT48Abd9zDyrwwz7NTs2BkjA5Q2x7GQ5nhY1S6T2ieJhBTiEJsSkK5TEGJjxzViCy4JpRsfzVHLqt6Ioqo_mot5uXaPnPAHbIfv-6GAUxAHICuR4gSs1qIHigGGtaV3bM85AJgrbb36DmWsCBBeUNP-r4Q"
+
+# # 临时公钥
+# epk = "APUHWWEf9ItwRwB51EmPp1vDQwxktlDCUJ0mRz3cBno="
+# # maxEpoch
+# maxEpoch = 66
+# # randomness
+# randomness = 129755896008919731799400095156330387789
+# # nonce
+# nonce = "q4Km2GnmfZR8O9PNA62yIj2xs0g"
+
+
+# 把公钥数组转换为ed25519公钥
+import struct
+
+epk = ["10576117717713998887337681800052029205259032", "83929355055751352554831714950413032872"]
+
+# 将字符串转换为整数
+epk_ints = [int(x) for x in epk]
+print(f"EPK integers: {epk_ints}")
+
+# Ed25519公钥是32字节，我们需要将这两个大整数转换为字节
+# 假设这两个整数代表公钥的两个部分，需要将它们打包成32字节
+pubkey_bytes = bytearray(32)
+
+# 将第一个整数转换为字节（前16字节）
+first_int = epk_ints[0]
+for i in range(16):
+    pubkey_bytes[i] = (first_int >> (8 * i)) & 0xFF
+
+# 将第二个整数转换为字节（后16字节）
+second_int = epk_ints[1]
+for i in range(16):
+    pubkey_bytes[16 + i] = (second_int >> (8 * i)) & 0xFF
+
+# 转换为base64编码
+epk_base64 = base64.b64encode(bytes(pubkey_bytes)).decode('utf-8')
+print(f"Ed25519 public key (base64): {epk_base64}")
+
+# 把ed25519公钥转换为整数
+# epk_base64 = "APUHWWEf9ItwRwB51EmPp1vDQwxktlDCUJ0mRz3cBno="
+
+
+# 将base64编码的ed25519公钥解码为字节
+pubkey_bytes_decoded = base64.b64decode(epk_base64)
+print(f"Decoded public key bytes length: {len(pubkey_bytes_decoded)}")
+print(f"Decoded public key bytes: {pubkey_bytes_decoded.hex()}")
+
+# 方法1：将32字节分为两个16字节的整数（小端序）
+first_int_decoded = int.from_bytes(pubkey_bytes_decoded[:16], byteorder='little')
+second_int_decoded = int.from_bytes(pubkey_bytes_decoded[16:], byteorder='little')
+epk_array_method1 = [str(first_int_decoded), str(second_int_decoded)]
+print(f"Method 1 - EPK array: {epk_array_method1}")
+
+# 方法2：将整个32字节作为一个大整数，然后分解为两个128位的部分
+combined_int_decoded = int.from_bytes(pubkey_bytes_decoded, byteorder='little')
+# 提取低128位和高128位
+low_128_bits = combined_int_decoded & ((1 << 128) - 1)
+high_128_bits = combined_int_decoded >> 128
+epk_array_method2 = [str(low_128_bits), str(high_128_bits)]
+print(f"Method 2 - EPK array: {epk_array_method2}")
+
+# 验证：比较原始的epk数组和解码后的数组
+print(f"Original EPK: {epk}")
+print(f"Does method 1 match original? {epk_array_method1 == epk}")
+print(f"Does method 2 match original? {epk_array_method2 == epk}")
