@@ -101,10 +101,10 @@ payload = jwt.split('.')[1]
 payload = base64url_decode(payload)
 
 # # 处理iss
-# (iss, iss_length, iss_start_index_b64, iss_length_b64, iss_colon_index, iss_value_index, iss_value_length, iss_value) = claimOperations(payload, '"iss"', offset = first_dot_index + 1)
+(iss, iss_length, iss_start_index_b64, iss_length_b64, iss_colon_index, iss_value_index, iss_value_length, iss_value) = claimOperations(payload, '"iss"', offset = first_dot_index + 1)
 
 # # 把iss每16字节转换为一个int
-# iss_value_ints = [int.from_bytes(iss_value.encode('utf-8')[i:i+16], 'big') for i in range(0, len(iss_value.encode('utf-8')), 16)]
+iss_value_ints = [int.from_bytes(iss_value.encode('utf-8')[i:i+16], 'big') for i in range(0, len(iss_value.encode('utf-8')), 16)]
 
 # 处理aud
 (aud, aud_length, aud_index_b64, aud_length_b64, aud_colon_index, aud_value_index, aud_value_length, aud_value) = claimOperations(payload, '"aud"', offset = first_dot_index + 1)
@@ -123,6 +123,9 @@ maxSubValueLen = 130
 # 把sub_int填充全0到maxSubValueLen长度
 sub_int = sub_int + [0] * (maxSubValueLen - len(sub_int))
 
+# 随便造一个path
+path = [0, 111, 1, 222]
+
 output = {
     "padded_unsigned_jwt": padded_unsigned_jwt,
     "payload_start_index": first_dot_index + 1,
@@ -130,7 +133,7 @@ output = {
     # "sha2pad_index": second_dot_index,
     # "iss_index_b64": first_dot_index + 1 + iss_start_index_base64,
     # "iss_length_b64": iss_end_index_base64 - iss_start_index_base64,
-    # "iss": iss_value_ints,
+    "iss": iss_value_ints,
     "aud": aud_int,
     "aud_length": aud_length,
     "aud_index_b64": aud_index_b64,
@@ -144,7 +147,8 @@ output = {
     "sub_length_b64": sub_length_b64,
     "sub_colon_index": sub_colon_index,
     "sub_value_index": sub_value_index,
-    "sub_value_length": sub_value_length
+    "sub_value_length": sub_value_length,
+    "path": path
 }
 
 with open('input.json', 'w') as f:

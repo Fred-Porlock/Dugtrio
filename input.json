@@ -1602,6 +1602,10 @@
         0
     ],
     "payload_start_index": 103,
+    "iss": [
+        45736112714757259337442377627302456948,
+        9125600045189321636669570379042
+    ],
     "aud": [
         34,
         97,
@@ -1907,5 +1911,11 @@
     "sub_length_b64": 41,
     "sub_colon_index": 5,
     "sub_value_index": 6,
-    "sub_value_length": 23
+    "sub_value_length": 23,
+    "path": [
+        0,
+        111,
+        1,
+        222
+    ]
 }
